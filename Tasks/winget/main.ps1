@@ -1,5 +1,7 @@
 param (
     [Parameter()]
+    [string]$Configuration,
+    [Parameter()]
     [string]$ConfigurationFile,
     [Parameter()]
     [string]$DownloadUrl,
@@ -15,6 +17,7 @@ $RunAsUserScript = "runAsUser.ps1"
 $CleanupScript = "cleanup.ps1"
 $RunAsUserTask = "DevBoxCustomizations"
 $CleanupTask = "DevBoxCustomizationsCleanup"
+$ConfigurationFileName = "configuration.dsc.yaml"
 
 function SetupScheduledTasks {
     Write-Host "Setting up scheduled tasks"
@@ -136,6 +139,27 @@ function WithRetry {
     throw $lastException
 }
 
+function Decode-Base64String {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$EncodedContent
+    )
+
+    try {
+        # Convert from Base64 to a byte array
+        $bytes = [Convert]::FromBase64String($EncodedContent)
+
+        # Decode the byte array back to the original string
+        $decodedString = [System.Text.Encoding]::UTF8.GetString($bytes)
+
+        # Return the decoded string
+        return $decodedString
+    } catch {
+        Write-Error "An error occurred during decoding: $_"
+    }
+}
+
+
 InstallPS7
 $installed_winget = InstallWinGet
 
@@ -171,6 +195,21 @@ if ($Package) {
     }
 }
 
+if ($Configuration)
+{
+    $decodedString = Decode-Base64String -EncodedContent $Configuration
+
+    # if ConfigurationFile is null or empty we set the Value of ConfigurationFile to the path of the configuration file
+    if (-not $ConfigurationFile) {
+        $ConfigurationFile = "$($CustomizationScriptsDir)\$($ConfigurationFileName)"
+    }
+
+    Set-Content -Path $ConfigurationFile -Value $Configuration
+
+    # ignore the DownloadUrl if Configuration is provided
+    $DownloadUrl = ''
+}
+
 if ($ConfigurationFile) {
     if ($DownloadUrl) {
         $ConfigurationFileDir = Split-Path -Path $ConfigurationFile
@@ -182,6 +221,7 @@ if ($ConfigurationFile) {
         Invoke-WebRequest -Uri $DownloadUrl -OutFile $ConfigurationFile
     }
 
+    
     if ($RunAsUser -eq "true") {
         AppendToUserScript "Get-WinGetConfiguration -File $($ConfigurationFile) | Invoke-WinGetConfiguration -AcceptConfigurationAgreements"
         AppendToUserScript '$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")'

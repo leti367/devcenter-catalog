@@ -6,6 +6,12 @@ description: Applies a winget configuration to the Dev Box.
 author: Microsoft Corporation
 command: './main.ps1 -ConfigurationFile {{configurationFile}} -DownloadUrl {{downloadUrl}} -Package {{package}} -RunAsUser {{runAsUser}}'
 parameters:
+  configuration:
+    default: ''
+    type: 'string'
+    required: false
+    description: | 
+      The base64-encoded configuration DSC yaml payload. 
   configurationFile:
     default: ''
     type: 'string'
